@@ -1,0 +1,22 @@
+[package]
+name = "view-hardware"
+version = "0.1.0"
+edition = "2021"
+homepage = "https://github.com/tengfei-xy/view-hardware"
+repository = "https://github.com/tengfei-xy/view-hardware"
+license = "MIT OR Apache-2.0"
+keywords = ["hardware", "info", "config", "view"]
+readme = "README.MD"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = {version="1.0.193", features = ["derive"]}
+serde-xml-rs = "0.6.0"
+serde_json = "1.0.108"
+
+[target]
+
+[[bin]]
+name = "vh"
+path = "src/main.rs"
