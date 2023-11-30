@@ -2,6 +2,7 @@
 name = "view-hardware"
 version = "0.1.0"
 edition = "2021"
+description="Hardware viewing tools for major platforms."
 homepage = "https://github.com/tengfei-xy/view-hardware"
 repository = "https://github.com/tengfei-xy/view-hardware"
 license = "MIT OR Apache-2.0"
