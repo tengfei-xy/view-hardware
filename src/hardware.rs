@@ -1,8 +1,8 @@
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::process::Command;
 use std::sync::mpsc;
 use std::thread;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Cpu {
@@ -54,7 +54,6 @@ pub enum OptDisk {
     ArrayType(Vec<Disk>),
 }
 
-
 pub struct Win {
     c: OptCPU,
     m: OptMemory,
@@ -87,6 +86,9 @@ impl Hardware {
         }
     }
     fn check_cpu_same(&self) -> bool {
+        if self.c.len() == 1 {
+            return true;
+        }
         let mut name = String::new();
         for c in &self.c {
             if name.is_empty() {
@@ -98,32 +100,32 @@ impl Hardware {
         }
         true
     }
-    fn display_cpu(&self) {
-        if self.c.len() == 1 {
-            println!(
-                "CPU: 1 * {},{}核{}线程",
-                self.c[0].name, self.c[0].number_of_cores, self.c[0].number_of_logical_processors
-            );
-            return;
-        }
+    pub fn get_cpu(&self) -> String {
         if self.check_cpu_same() {
-            println!(
-                "CPU: {} * {},{}核{}线程",
+            return format!(
+                "{} * {},{}核{}线程",
                 self.c.len(),
                 self.c[0].name,
                 self.c[0].number_of_cores,
                 self.c[0].number_of_logical_processors
             );
-        } else {
-            for c in &self.c {
-                println!(
-                    "CPU: {},{}核{}线程",
-                    c.name, c.number_of_cores, c.number_of_logical_processors
-                );
-            }
         }
+        let mut s = String::new();
+        for c in &self.c {
+            s.push_str(
+                format!(
+                    "{} {}核{}线程,",
+                    c.name, c.number_of_cores, c.number_of_logical_processors
+                )
+                .as_str(),
+            );
+        }
+        s
     }
     fn check_memory_same(&self) -> bool {
+        if self.m.len() == 1 {
+            return true;
+        }
         let mut capacity = 0;
         let mut speed = 0;
         for m in &self.m {
@@ -137,92 +139,30 @@ impl Hardware {
         }
         true
     }
-    fn display_memory(&self) {
-        if self.m.len() == 1 {
-            #[cfg(target_os = "windows")]
-            {
-                println!(
-                    "Memory: 1 * {}GB,{}MHz,{}",
-                    self.m[0].capacity,
-                    self.m[0].speed,
-                    Win::get_memory_type(self.m[0].memory_type_seq)
-                );
-            }
-            #[cfg(target_os = "macos")]
-            {
-                println!(
-                    "Memory: 1 * {}GB,{}MHz,{}",
-                    self.m[0].capacity, self.m[0].speed, self.m[0].memory_type
-                );
-            }
-            #[cfg(target_os = "linux")]
-            {
-                println!(
-                    "Memory: 1 * {}GB,{}MHz,{}",
-                    self.m[0].capacity, self.m[0].speed, self.m[0].memory_type
-                );
-            }
-
-            return;
-        }
+    pub fn get_memory(&self) -> String {
         if self.check_memory_same() {
-            #[cfg(target_os = "windows")]
-            {
-                println!(
-                    "Memory: {} * {}GB,{}MHz,{}",
-                    self.m.len(),
-                    self.m[0].capacity,
-                    self.m[0].speed,
-                    Hardware::get_memory_type(self.m[0].memory_type_seq, self.m[0].memory_type)
-                );
-            }
-            #[cfg(target_os = "macos")]
-            {
-                println!(
-                    "Memory: {} * {}GB,{}MHz,{}",
-                    self.m.len(),
-                    self.m[0].capacity,
-                    self.m[0].speed,
-                    self.m[0].memory_type
-                );
-            }
-            #[cfg(target_os = "linux")]
-            {
-                println!(
-                    "Memory: {} * {}GB,{}MHz,{}",
-                    self.m.len(),
-                    self.m[0].capacity,
-                    self.m[0].speed,
-                    self.m[0].memory_type
-                );
-            }
-        } else {
-            #[cfg(target_os = "windows")]
-            {
-                for m in &self.m {
-                    println!(
-                        "Memory: {}GB,{}MHz,{}",
-                        m.capacity,
-                        m.speed,
-                        Hardware::get_memory_type(m.memory_type_seq, self.m[0].memory_type)
-                    );
-                }
-            }
-            #[cfg(target_os = "macos")]
-            {
-                for m in &self.m {
-                    println!("Memory: {}GB,{}MHz,{}", m.capacity, m.speed, m.memory_type);
-                }
-            }
-            #[cfg(target_os = "linux")]
-            {
-                for m in &self.m {
-                    println!("Memory: {}GB,{}MHz,{}", m.capacity, m.speed, m.memory_type);
-                }
-            }
+            return format!(
+                "{} * {}GB,{}MHz,{}",
+                self.m.len(),
+                self.m[0].capacity,
+                self.m[0].speed,
+                self.m[0].memory_type
+            );
         }
+
+
+        let mut s = String::new();
+        for m in &self.m {
+            s.push_str(format!("{}GB {}MHz {},", m.capacity, m.speed, m.memory_type).as_str());
+        }
+
+        s
     }
     fn check_disk_same(&self) -> bool {
+        if self.d.len() == 1 {
+            return true;
+        }
+
         let mut media_type = String::new();
         let mut size = 0;
         for d in &self.d {
@@ -236,33 +176,27 @@ impl Hardware {
         }
         true
     }
-    fn display_disk(&self) {
-        if self.d.len() == 1 {
-            println!(
-                "Disk: 1 * {}GB,{}",
-                Win::decimal(self.d[0].size),
-                self.d[0].media_type
-            );
-            return;
-        }
+    pub fn get_disk(&self) -> String {
         if self.check_disk_same() {
-            println!(
-                "Disk: {} * {}GB,{}",
+            return format!(
+                "{} * {}GB,{}",
                 self.d.len(),
-                Win::decimal(self.d[0].size),
+                self.d[0].size,
                 self.d[0].media_type
             );
-        } else {
-            for d in &self.d {
-                println!("Disk: {}GB,{}", Win::decimal(d.size), d.media_type);
-            }
         }
+
+        let mut s = String::new();
+        for d in &self.d {
+            s.push_str(format!("{}GB {},", d.size, d.media_type).as_str());
+        }
+        s
     }
 
     pub fn display(&self) {
-        self.display_cpu();
-        self.display_memory();
-        self.display_disk();
+        println!("CPU: {}", self.get_cpu());
+        println!("Memory: {}", self.get_memory());
+        println!("Disk: {}", self.get_disk());
     }
 }
 
@@ -326,7 +260,18 @@ impl Win {
 
     fn get_memory() -> OptMemory {
         let cmd_result = Win::powershell("Get-WmiObject -Class Win32_PhysicalMemory | Select-Object @{Name='Capacity'; Expression={$_.Capacity / 1GB}}, Speed, MemoryType | ConvertTo-Json");
-        serde_json::from_str(cmd_result.as_str()).unwrap()
+        let mut s = serde_json::from_str(cmd_result.as_str()).unwrap();
+        match &mut s {
+            OptMemory::StructType(memory) => {
+                memory.memory_type = Win::get_memory_type(memory.memory_type_seq).to_string();
+            }
+            OptMemory::ArrayType(memory_vec) => {
+                for memory in memory_vec {
+                    memory.memory_type =  Win::get_memory_type(memory.memory_type_seq).to_string();
+                }
+            }
+        }
+        s
     }
 
     pub fn convert_memory(&self) -> Vec<Memory> {
@@ -341,7 +286,19 @@ impl Win {
         let cmd_result = Win::powershell(
             "Get-PhysicalDisk |select mediaType,FriendlyName,Size | ConvertTo-Json",
         );
-        serde_json::from_str(cmd_result.as_str()).unwrap()
+        let mut s = serde_json::from_str(cmd_result.as_str()).unwrap();
+        match &mut s {
+            OptDisk::StructType(disk) => {
+                disk.size = Win::rounding(disk.size);
+            }
+            OptDisk::ArrayType(disk_vec) => {
+                for disk in disk_vec {
+                    disk.size = Win::rounding(disk.size);
+                }
+            }
+        }
+        s
+
     }
     pub fn convert_disk(&self) -> Vec<Disk> {
         let mut v: Vec<Disk> = Vec::new();
@@ -363,7 +320,7 @@ impl Win {
             _ => "未知",
         }
     }
-    fn decimal(mut d: u64) -> u64 {
+    fn rounding(mut d: u64) -> u64 {
         d = d / 1024 / 1024 / 1024;
         let v: [u64; 6] = [120, 240, 500, 1000, 2000, 4000];
         let mut min_diff = std::u64::MAX;
@@ -388,7 +345,6 @@ impl Win {
     }
 }
 impl Mac {
-    
     fn build() -> Hardware {
         let c = Mac::get_cpu();
         let m = Mac::get_memory();
@@ -461,21 +417,38 @@ impl Mac {
         }
         retval
     }
-    fn get_disk() ->Vec<Disk>{
-        let mut retval :Vec<Disk> = Vec::new();
+    fn get_disk() -> Vec<Disk> {
+        let mut retval: Vec<Disk> = Vec::new();
         let cmd = Mac::command("diskutil info -plist /dev/disk0 | plutil -convert json -o - -");
-        let value: Value  = serde_json::from_str(cmd.as_str()).unwrap();
+        let value: Value = serde_json::from_str(cmd.as_str()).unwrap();
         let media_name: String = value.get("MediaName").unwrap().to_string();
-        let media_type = if media_name.contains("SSD"){"SSD"}else{"未知"};
-        let size  = value.get("Size").unwrap().as_u64().expect("未知") ;
+        let media_type = if media_name.contains("SSD") {
+            "SSD"
+        } else {
+            "未知"
+        };
+        let size = value.get("Size").unwrap().as_u64().expect("未知");
 
-        retval.push( Disk{
-            friendly_name:media_name,
-            media_type:media_type.to_string(),
-            size:size,
-
+        retval.push(Disk {
+            friendly_name: media_name,
+            media_type: media_type.to_string(),
+            size: Mac::rounding(size) ,
         });
         retval
+    }
+    fn rounding(mut d : u64) -> u64 {
+        d = d /1024/1024/1024;
+        let v: [u64; 6] = [120, 240, 500, 1000, 2000, 4000];
+        let mut min_diff = std::u64::MAX;
+        let mut closest_value: u64 = d;
 
+        for &n in v.iter() {
+            let diff = (d as i64 - n as i64).abs() as u64;
+            if diff < min_diff {
+                min_diff = diff;
+                closest_value = n;
+            }
+        }
+        closest_value
     }
 }
