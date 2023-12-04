@@ -36,3 +36,11 @@ Memory: 1 * 16GB,1600MHz,DDR3
 Disk: 1 * 500GB,SSD
 ```
 
+linux
+
+```bash
+[root@localhost ~]$ ./vh
+CPU: 1 * Intel(R) Xeon(R) Gold 6133 CPU @ 2.50GHz,4核1线程
+Memory: 1 * 16GB,0MHz,
+Disk: 1 * 120GB,SSD
+```

@@ -54,22 +54,14 @@ pub enum OptDisk {
     ArrayType(Vec<Disk>),
 }
 
-pub struct Win {
-    c: OptCPU,
-    m: OptMemory,
-    d: OptDisk,
-}
+
 pub struct Hardware {
     c: Vec<Cpu>,
     m: Vec<Memory>,
     d: Vec<Disk>,
 }
 #[allow(dead_code)]
-pub struct Mac {
-    c: Vec<Cpu>,
-    m: Vec<Memory>,
-    d: Vec<Disk>,
-}
+
 impl Hardware {
     pub fn build() -> Hardware {
         #[cfg(target_os = "windows")]
@@ -82,7 +74,7 @@ impl Hardware {
         }
         #[cfg(target_os = "linux")]
         {
-            // Linux::build()
+            Linux::build()
         }
     }
     fn check_cpu_same(&self) -> bool {
@@ -201,6 +193,11 @@ impl Hardware {
 }
 
 #[allow(dead_code)]
+pub struct Win {
+    c: OptCPU,
+    m: OptMemory,
+    d: OptDisk,
+}
 impl Win {
     pub fn build() -> Win {
         // 创建一个通道，用于从线程中返回结果
@@ -344,6 +341,12 @@ impl Win {
         Hardware { c, m, d }
     }
 }
+pub struct Mac {
+    c: Vec<Cpu>,
+    m: Vec<Memory>,
+    d: Vec<Disk>,
+}
+
 impl Mac {
     fn build() -> Hardware {
         let c = Mac::get_cpu();
@@ -439,6 +442,129 @@ impl Mac {
     fn rounding(mut d : u64) -> u64 {
         d = d /1024/1024/1024;
         let v: [u64; 6] = [120, 240, 500, 1000, 2000, 4000];
+        let mut min_diff = std::u64::MAX;
+        let mut closest_value: u64 = d;
+
+        for &n in v.iter() {
+            let diff = (d as i64 - n as i64).abs() as u64;
+            if diff < min_diff {
+                min_diff = diff;
+                closest_value = n;
+            }
+        }
+        closest_value
+    }
+}
+pub struct Linux {
+    c: Vec<Cpu>,
+    m: Vec<Memory>,
+    d: Vec<Disk>,
+}
+impl Linux{
+    fn build() -> Hardware {
+        let c = Linux::get_cpu();
+        let m = Linux::get_memory();
+        let d = Linux::get_disk();
+        Hardware { c, m, d }
+    }
+    fn command(cmd: &str) -> String {
+        let cmd_result = Command::new("sh")
+            .args(&["-c", cmd])
+            .output()
+            .expect("failed to execute process");
+
+        String::from_utf8_lossy(&cmd_result.stdout).to_string()
+    }
+
+    fn get_cpu() -> Vec<Cpu> {
+        let mut retval: Vec<Cpu> = Vec::with_capacity(1);
+        let cmd_result = Linux::command("lscpu  | grep 'Model name'");
+        let name = cmd_result.split(":").nth(1).unwrap().trim();
+
+        let cmd_result =Linux::command("lscpu  | grep 'Core(s) per socket'");
+        let core_count =cmd_result.split(":").nth(1).unwrap().trim();
+        let cmd_result =Linux::command("lscpu  | grep 'Thread(s) per core'");
+        let thread_count = cmd_result.split(":").nth(1).unwrap().trim();
+
+        retval.push(Cpu {
+            name: name.trim().to_string(),
+            number_of_cores: core_count.trim().parse::<u32>().unwrap(),
+            number_of_logical_processors: thread_count.trim().parse::<u32>().unwrap(),
+        });
+        retval
+    }
+    fn get_memory() -> Vec<Memory> {
+        let cmd_result = Linux::command("cat /proc/meminfo");
+
+        let mut retval: Vec<Memory> = Vec::new();
+
+        let lines = cmd_result.trim().lines().map(|line| line.trim());
+        let mut iter = lines.into_iter().peekable();
+
+        while let Some(line) = iter.next() {
+            if line.starts_with("MemTotal:") {
+                let mut capacity: u64 = line
+                    .split_whitespace()
+                    .nth(1)
+                    .unwrap_or_default()
+                    .parse()
+                    .unwrap_or_default();
+                // let memory_type = iter
+                //     .next()
+                //     .unwrap_or_default()
+                //     .split_whitespace()
+                //     .nth(1)
+                //     .unwrap_or_default()
+                //     .to_string();
+                // let speed: u32 = iter
+                //     .next()
+                //     .unwrap_or_default()
+                //     .split_whitespace()
+                //     .nth(1)
+                //     .unwrap_or_default()
+                //     .parse()
+                //     .unwrap_or_default();
+
+                    capacity =     Linux::rounding(capacity);
+                
+
+                retval.push(Memory {
+                    capacity,
+                    speed: 0,
+                    memory_type_seq: 1,
+                    memory_type: "".to_string(),
+                });
+            }
+        }
+        retval
+    }
+    fn get_disk() -> Vec<Disk>{
+        let mut retval: Vec<Disk> = Vec::new();
+        let cmd = Linux::command("lsblk -d  -fs  -o FSTYPE,name,rota,size | grep '^[a-z]'");
+        let lines = cmd.trim().lines().map(|line| line.trim());
+        let mut iter = lines.into_iter().peekable();
+        while let Some(line) = iter.next() {
+            //ext4   vda1    1   120G
+            let mut line_iter = line.split_whitespace();
+            let _ = line_iter.next().unwrap_or_default();
+            let friendly_name = line_iter.next().unwrap_or_default();
+            let mut media_type = line_iter.next().unwrap_or_default();
+            let size = line_iter.next().unwrap_or_default();
+
+            let num_size = size.trim_end_matches("G").parse::<u64>().unwrap_or_default();
+            media_type = if media_type == "0" {
+                "HDD"
+            }else{
+                "SSD"
+            };
+            
+            retval.push(Disk { media_type: (media_type.to_string()), friendly_name: ( friendly_name.to_string()), size: num_size });
+        }
+        retval
+    }
+    fn rounding(mut d : u64) -> u64 {
+        d = d /1024/1024;
+        let v: [u64; 14] = [0,1,2,4,8,16,32,64,120, 240, 500, 1000, 2000, 4000];
         let mut min_diff = std::u64::MAX;
         let mut closest_value: u64 = d;
 
