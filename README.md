@@ -5,7 +5,7 @@
 安装方式
 
 ```
-cargo instll view-hardware
+cargo install view-hardware
 ```
 
 执行方式
